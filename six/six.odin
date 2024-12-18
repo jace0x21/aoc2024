@@ -23,6 +23,7 @@ main :: proc() {
     fmt.printf("Part 2: %d\n", loop_count)
 }
 
+// Represent the map and its state
 Map :: struct {
     text: []u8,
     width: int,
@@ -32,6 +33,9 @@ Map :: struct {
     cur_direction: Direction,
 }
 
+// Represent a tile on the map
+// We use the file's raw data to represent the map so 
+// we can treat newlines as the wall
 Tile :: enum u8 {
     Empty = '.', 
     Obstacle = '#', 
@@ -56,10 +60,12 @@ find_guard :: proc(input: string) -> int {
     return -1
 }
 
+// We always turn to the right
 turn :: proc(direction: Direction) -> Direction {
     return Direction((int(direction) + 1) % 4)
 }
 
+// Reset the board to its initial state
 reset :: proc(board: ^Map) {
     for idx in 0..<len(board.text) {
         if idx == board.start {
@@ -73,6 +79,7 @@ reset :: proc(board: ^Map) {
     board.cur_direction = .North
 }
 
+// Do arithmetic to determine neighbors
 get_neighbor :: proc(board: Map, idx: int, direction: Direction) -> int {
     switch direction {
     case .North:
@@ -102,13 +109,21 @@ get_neighbor :: proc(board: Map, idx: int, direction: Direction) -> int {
     }
 }
 
+// Find the unique tiles visited along the guard's path
+// If a infinite loop is detected, return -1
 find_path :: proc(board: ^Map) -> [dynamic]int {
     path: [dynamic]int
-    
+
+    // Reserve some capacity for our data structures
+    // to avoid time spent on resizing
     last_steps: [dynamic]int
+    reserve(&last_steps, 5000)
     defer delete(last_steps)
 
+    // The occurance map is to help us quickly find loops
+    // We do this by finding repeating sub-sequences in last_steps
     occurance_map := make(map[int][dynamic]int)
+    reserve(&occurance_map, 5000)
     defer delete(occurance_map)
 
     append(&path, board.cur_pos)
@@ -148,11 +163,12 @@ add_to_occurance_map :: proc(om: ^map[int][dynamic]int, k: int, v: int) {
     if k in om {
         append(&om[k], v)
     } else {
-        om[k] = make([dynamic]int)
+        om[k] = make([dynamic]int, 0, 10)
         append(&om[k], v)
     }
 }
 
+// Given a path, try placing one obstacle to find possible loops
 find_possible_loops :: proc(board: ^Map, path: []int) -> int {
     loop_count := 0
     for pos in path {
@@ -169,6 +185,7 @@ find_possible_loops :: proc(board: ^Map, path: []int) -> int {
     return loop_count
 }
 
+// Given the current steps a guard has taken, determine if they are in a loop
 has_loop :: proc(last_steps: []int, om: map[int][dynamic]int) -> bool {
     cur_pos := last_steps[len(last_steps)-1]
     for occurance in om[cur_pos] {
@@ -179,10 +196,6 @@ has_loop :: proc(last_steps: []int, om: map[int][dynamic]int) -> bool {
         if loop_len*2 > len(last_steps) {
             continue
         }
-        //fmt.printf("Comparing:\n1: %v\n2: %v\n",
-        //    last_steps[occurance-loop_len+1:occurance+1],
-        //    last_steps[occurance+1:])
-        //os.flush(os.stdout)             
         if slice.equal(
             last_steps[occurance-loop_len+1:occurance+1],
             last_steps[occurance+1:]) {
